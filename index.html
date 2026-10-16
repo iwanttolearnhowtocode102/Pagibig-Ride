@@ -138,6 +138,60 @@
             </div>
         </div>
 
+        <!-- USER DASHBOARD -->
+        <div id="view-user" class="view">
+            <div style="padding: 30px 20px;">
+                <div class="profile-card">
+                    <div class="profile-avatar">U</div>
+                    <h2 id="user-name">Member Name</h2>
+                    <p id="user-meta">Church ID: 123456 • Quezon City Locale</p>
+                    <button class="button alt" style="margin-top: 15px;" onclick="app.navigate('auth')">Edit Profile</button>
+                </div>
+                <h3 class="heading" style="font-size: 22px; margin: 30px 0 15px;">My Activity</h3>
+                <div id="user-rides-list">
+                    <!-- Rides requested by user -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN DASHBOARD -->
+        <div id="view-admin" class="view">
+            <div style="padding: 30px 20px;">
+                <h2 class="heading">Admin Control Center</h2>
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="label">Total Rides</div>
+                        <div class="value" id="stat-total-rides">12</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Active Drivers</div>
+                        <div class="value" id="stat-active-drivers">5</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="label">Pending Requests</div>
+                        <div class="value" id="stat-pending">8</div>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="font-size: 18px; font-weight: 700;">Ride Management</h3>
+                    <button class="button" style="padding: 8px 15px; font-size: 12px;" onclick="app.notify('Opening Ride Creator...', 'success')">Create Ride</button>
+                </div>
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Ride</th>
+                            <th>Driver</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-ride-list">
+                        <!-- Admin rides injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- AUTH VIEW -->
         <div id="view-auth" class="view">
             <div style="display:grid; place-items:center; height:100vh; padding:20px;">
@@ -204,6 +258,14 @@
                 <svg viewBox="0,0,24,24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <span>Driver</span>
             </div>
+            <div class="nav-item" onclick="app.navigate('user')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span>User</span>
+            </div>
+            <div class="nav-item" onclick="app.navigate('admin')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="M15 3v18"></path></svg>
+                <span>Admin</span>
+            </div>
         </div>
     </div>
 
@@ -226,9 +288,28 @@
 
             init() {
                 this.setupFirebase();
+                this.setupToasts();
                 this.renderRides();
                 this.navigate('home');
                 console.log("PagibigRide SPA Initialized");
+            },
+
+            setupToasts() {
+                const container = document.createElement('div');
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+                this.toastContainer = container;
+            },
+
+            notify(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerText = message;
+                this.toastContainer.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 400);
+                }, 3000);
             },
 
             setupFirebase() {
@@ -239,6 +320,16 @@
             },
 
             navigate(viewId) {
+                // Role-based Guarding
+                if (viewId === 'admin' && (!this.currentUser || this.currentUser.role !== 'admin')) {
+                    this.notify('Admin access required!', 'error');
+                    return this.navigate('home');
+                }
+                if (viewId === 'user' && (!this.currentUser || this.currentUser.role !== 'user')) {
+                    this.notify('Please sign in to view your dashboard', 'error');
+                    return this.navigate('auth');
+                }
+
                 // Hide all views
                 document.querySelectorAll('.view').forEach(v => {
                     v.classList.remove('active', 'slide-in');
@@ -246,24 +337,43 @@
 
                 // Show target view
                 const target = document.getElementById('view-' + viewId);
-                target.classList.add('active', 'slide-in');
+                if (target) {
+                    target.classList.add('active', 'slide-in');
+                } else {
+                    console.error(`View ${viewId} not found`);
+                    return;
+                }
 
                 // Update Nav
                 document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-                const navIndex = { 'home': 0, 'map': 1, 'driver': 2 };
+                const navIndex = { 'home': 0, 'map': 1, 'driver': 2, 'user': 3, 'admin': 4 };
                 if (navIndex[viewId] !== undefined) {
-                    document.querySelectorAll('.nav-item')[navIndex[viewId]].classList.add('active');
+                    const navItems = document.querySelectorAll('.nav-item');
+                    if (navItems[navIndex[viewId]]) {
+                        navItems[navIndex[viewId]].classList.add('active');
+                    }
                 }
 
                 // Special logic for views
                 if (viewId === 'map') this.initMap();
                 if (viewId === 'driver') this.initDriverTracker();
+                if (viewId === 'user') this.renderUserDashboard();
+                if (viewId === 'admin') this.renderAdminDashboard();
             },
 
             handleLogin() {
-                // Mock login for now
-                this.currentUser = { role: 'passenger', name: 'User' };
-                this.navigate('home');
+                const email = document.querySelector('#login-email')?.value || "";
+
+                // Mock Role Logic
+                if (email.toLowerCase().includes('admin')) {
+                    this.currentUser = { role: 'admin', name: 'Administrator', id: 'adm_01' };
+                    this.notify('Welcome, Administrator!', 'success');
+                    this.navigate('admin');
+                } else {
+                    this.currentUser = { role: 'user', name: 'Member', id: 'usr_01' };
+                    this.notify('Welcome back!', 'success');
+                    this.navigate('user');
+                }
             },
 
             renderRides() {
@@ -289,8 +399,8 @@
             },
 
             requestRide() {
-                alert("Ride Requested! Redirecting you to the live map...");
-                this.navigate('map');
+                this.notify("Ride Requested! Redirecting to live map...", "success");
+                setTimeout(() => this.navigate('map'), 1500);
             },
 
             showRideDetails(rideId) {
