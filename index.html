@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PagibigRide — Ride together in love</title>
+    <link rel="icon" type="image/png" href="pagibigride-submark.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* SPA Core Styles */
+        body { margin: 0; padding: 0; overflow: hidden; height: 100vh; width: 100vw; }
+        #app-shell { height: 100vh; width: 100vw; position: relative; overflow: hidden; }
+
+        .view {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+            background: var(--blue-50);
+            overflow-y: auto;
+            display: none;
+        }
+        .view.active { display: block; }
+
+        /* View Animations */
+        .slide-in { animation: slideIn 0.4s forwards; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Map Integration */
+        #map-container { height: 100%; width: 100%; position: relative; }
+        #map { height: 100%; width: 100%; }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 65px; background: white; display: flex;
+            justify-content: space-around; align-items: center;
+            border-top: 1px solid #dceaf7; z-index: 2000;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            font-size: 11px; font-weight: 600; color: var(--muted);
+            cursor: pointer; transition: 0.3s;
+        }
+        .nav-item.active { color: var(--navy); }
+        .nav-item svg { width: 24px; height: 24px; margin-bottom: 4px; }
+
+        /* Grab-style Bottom Sheet for Map */
+        .map-bottom-sheet {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: white; z-index: 1000; border-radius: 24px 24px 0 0;
+            padding: 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+            transform: translateY(0); transition: 0.3s;
+            border-top: 1px solid #dceaf7;
+        }
+        .sheet-handle { width: 40px; height: 4px; background: #dceaf7; border-radius: 2px; margin: 0 auto 20px; }
+        .driver-row { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .driver-avatar { width: 45px; height: 45px; border-radius: 50%; background: var(--blue-100); display: grid; place-items: center; font-weight: 700; color: var(--navy); }
+        .status-pill { background: var(--red); color: white; padding: 3px 8px; border-radius: 99px; font-size: 10px; }
+    </style>
+</head>
+<body>
+    <div id="app-shell">
+
+        <!-- HOME VIEW -->
+        <div id="view-home" class="view active">
+            <nav class="nav">
+                <a class="brand" href="#">
+                    <img class="brand-logo" src="pagibigride-submark.png" alt="">
+                    <img class="brand-wordmark" src="pagibigride-wordmark.png" alt="PagibigRide">
+                </a>
+                <div class="navlinks">
+                    <a class="button alt" href="#" onclick="app.navigate('auth')">Sign in</a>
+                    <a class="button" href="#" onclick="app.navigate('auth')">Join</a>
+                </div>
+            </nav>
+            <main>
+                <section class="rides" style="padding-bottom: 80px;">
+                    <div class="rides-wrap">
+                        <div class="rides-heading">
+                            <div>
+                                <div class="label">Travel together</div>
+                                <h2 class="heading">Available rides</h2>
+                            </div>
+                        </div>
+                        <div id="ride-list">
+                            <!-- Rides injected by JS -->
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- DETAILS VIEW (MODAL) -->
+        <div id="view-details" class="view">
+            <div class="ride-modal">
+                <div class="ride-modal-heading">
+                    <div>
+                        <div class="label">Ride Details</div>
+                        <h2 id="detail-title">Ride Name</h2>
+                    </div>
+                    <button class="ride-modal-close" onclick="app.navigate('home')">&times;</button>
+                </div>
+
+                <div class="ride-detail-grid">
+                    <div class="ride-detail-item"><strong>Pickup point</strong><span id="detail-pickup">...</span></div>
+                    <div class="ride-detail-item"><strong>Destination</strong><span id="detail-dest">...</span></div>
+                    <div class="ride-detail-item"><strong>Vehicle</strong><span id="detail-vehicle">...</span></div>
+                </div>
+
+                <div class="ride-map-section">
+                    <div class="ride-map-heading">
+                        <span>Route</span>
+                        <a href="#" id="google-maps-link">Open in Google Maps ↗</a>
+                    </div>
+                    <div id="detail-map" class="ride-map"></div>
+                </div>
+
+                <div class="ride-modal-footer">
+                    <div class="messaging-ui">
+                        <p class="label">Message Driver</p>
+                        <p class="helper-text">Ask a question about this ride.</p>
+                        <div class="input-group">
+                            <input type="text" placeholder="Type your message...">
+                            <button class="button">Send</button>
+                        </div>
+                    </div>
+                    <div class="ride-modal-request">
+                        <button class="button" onclick="app.requestRide()">Request a ride</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AUTH VIEW -->
+        <div id="view-auth" class="view">
+            <div style="display:grid; place-items:center; height:100vh; padding:20px;">
+                <div class="status-card" style="text-align:center">
+                    <img src="pagibigride-submark.png" style="width:60px; margin-bottom:20px">
+                    <h2 style="color:var(--navy)">Welcome Back</h2>
+                    <input type="email" placeholder="Email" style="width:100%; padding:12px; margin:10px 0; border:1px solid #dceaf7; border-radius:10px">
+                    <input type="password" placeholder="Password" style="width:100%; padding:12px; margin:10px 0; border:1px solid #dceaf7; border-radius:10px">
+                    <button class="button" style="width:100%; margin-top:20px" onclick="app.handleLogin()">Sign In</button>
+                    <p style="font-size:12px; margin-top:15px; color:var(--muted)">Don't have an account? <a href="#" style="color:var(--navy)">Sign Up</a></p>
+                    <button class="button alt" style="width:100%; margin-top:10px" onclick="app.navigate('home')">Back to Home</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAP VIEW (Live Tracking) -->
+        <div id="view-map" class="view">
+            <div id="map-container">
+                <div class="map-header">
+                    <img src="pagibigride-submark.png" alt="logo">
+                    <span>Tracking Your Ride</span>
+                </div>
+                <div id="map"></div>
+                <div class="map-bottom-sheet">
+                    <div class="sheet-handle"></div>
+                    <div class="driver-row">
+                        <div class="driver-avatar" id="driver-initials">BJ</div>
+                        <div class="driver-details">
+                            <h3 id="driver-name">Connecting...</h3>
+                            <p id="driver-car">Waiting for driver details...</p>
+                        </div>
+                        <div style="margin-left:auto" class="status-pill" id="ride-status">Syncing</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DRIVER VIEW -->
+        <div id="view-driver" class="view">
+            <div style="display:grid; place-items:center; height:100vh; padding:20px;">
+                <div class="status-card" style="text-align:center">
+                    <div class="pulse-container" id="driver-pulse" style="display:none; margin: 0 auto 20px; position:relative; width:60px; height:60px;">
+                        <div class="pulse-ring" style="position:absolute; width:100%; height:100%; border:4px solid #4CAF50; border-radius:50%; animation: pulse 2s infinite; opacity:0"></div>
+                        <div class="status-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:30px; height:30px; background:#4CAF50; border-radius:50%"></div>
+                    </div>
+                    <h2 style="color:var(--navy)" id="driver-status-text">Initializing GPS...</h2>
+                    <p style="color:var(--muted)" id="driver-coords">Waiting for signal...</p>
+                    <button class="button" style="margin-top:20px" onclick="location.reload()">Reconnect</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Bottom Nav -->
+        <div class="bottom-nav" id="main-nav">
+            <div class="nav-item active" onclick="app.navigate('home')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                <span>Home</span>
+            </div>
+            <div class="nav-item" onclick="app.navigate('map')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                <span>Track</span>
+            </div>
+            <div class="nav-item" onclick="app.navigate('driver')">
+                <svg viewBox="0,0,24,24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>Driver</span>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes pulse {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+    </style>
+
+    <!-- SDKs -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="config.js"></script>
+    <script>
+        // THE BRAIN OF THE APP
+        const app = {
+            currentUser: null,
+
+            init() {
+                this.setupFirebase();
+                this.renderRides();
+                this.navigate('home');
+                console.log("PagibigRide SPA Initialized");
+            },
+
+            setupFirebase() {
+                firebase.initializeApp({
+                    apiKey: window.PAGIBIGRIDE_CONFIG.firebaseApiKey,
+                    databaseURL: window.PAGIBIGRIDE_CONFIG.firebaseDatabaseURL
+                });
+            },
+
+            navigate(viewId) {
+                // Hide all views
+                document.querySelectorAll('.view').forEach(v => {
+                    v.classList.remove('active', 'slide-in');
+                });
+
+                // Show target view
+                const target = document.getElementById('view-' + viewId);
+                target.classList.add('active', 'slide-in');
+
+                // Update Nav
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                const navIndex = { 'home': 0, 'map': 1, 'driver': 2 };
+                if (navIndex[viewId] !== undefined) {
+                    document.querySelectorAll('.nav-item')[navIndex[viewId]].classList.add('active');
+                }
+
+                // Special logic for views
+                if (viewId === 'map') this.initMap();
+                if (viewId === 'driver') this.initDriverTracker();
+            },
+
+            handleLogin() {
+                // Mock login for now
+                this.currentUser = { role: 'passenger', name: 'User' };
+                this.navigate('home');
+            },
+
+            renderRides() {
+                const rides = [
+                    { id: 1, title: "Wednesday Prayer Meeting", driver: "Brother Joseph", destination: "Mini Chapel", pickup: "Main Gate", vehicle: "White Toyota Innova", time: "4:00 AM", seats: 3 },
+                    { id: 2, title: "Thursday Prayer Meeting", driver: "Sister Rachel", destination: "Mini Chapel", pickup: "South Lobby", vehicle: "Silver Honda City", time: "8:00 AM", seats: 2 },
+                    { id: 3, title: "Saturday Worship", driver: "Brother Daniel", destination: "Mini Chapel", pickup: "East Parking", vehicle: "Black Mitsubishi Pajero", time: "4:00 AM", seats: 5 }
+                ];
+
+                const container = document.getElementById('ride-list');
+                container.innerHTML = rides.map(ride => `
+                    <article class="ride-card">
+                        <div class="ride-date"><span>WED</span><strong>${ride.time.split(' ')[0]}</strong><span>${ride.time.split(' ')[1]}</span></div>
+                        <div class="ride-info">
+                            <div class="ride-title-row"><h3>${ride.title}</h3><span class="ride-status">${ride.seats} seats available</span></div>
+                            <p class="ride-destination">⌖ ${ride.destination}</p>
+                            <p class="ride-driver">${ride.driver} is driving</p>
+                        </div>
+                        <button class="button ride-action ride-details-button" onclick="app.showRideDetails(${ride.id})">View details</button>
+                    </article>
+                `).join('');
+                this.ridesData = rides;
+            },
+
+            requestRide() {
+                alert("Ride Requested! Redirecting you to the live map...");
+                this.navigate('map');
+            },
+
+            showRideDetails(rideId) {
+                const ride = this.ridesData.find(r => r.id === rideId);
+                if (!ride) return;
+
+                document.getElementById('detail-title').innerText = ride.title;
+                document.getElementById('detail-pickup').innerText = ride.pickup;
+                document.getElementById('detail-dest').innerText = ride.destination;
+                document.getElementById('detail-vehicle').innerText = ride.vehicle;
+
+                this.navigate('details');
+                this.initDetailMap(ride);
+            },
+
+            // MAP ENGINE
+            mapInstance: null,
+            mapMarker: null,
+            initMap() {
+                if (this.mapInstance) return;
+
+                this.mapInstance = L.map('map', { zoomControl: false }).setView([14.5995, 120.9842], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.mapInstance);
+
+                const carIcon = L.divIcon({
+                    html: '<div style="background: #efad13; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>',
+                    className: 'custom-div-icon', iconSize: [18, 18]
+                });
+
+                const db = firebase.database();
+                db.ref('locations/driver_1').on('value', (snap) => {
+                    const data = snap.val();
+                    if (data) {
+                        const { lat, lng } = data;
+                        if (!this.mapMarker) {
+                            this.mapMarker = L.marker([lat, lng], { icon: carIcon }).addTo(this.mapInstance);
+                            this.mapInstance.setView([lat, lng], 16);
+                        } else {
+                            this.mapMarker.setLatLng([lat, lng]);
+                            this.mapInstance.panTo([lat, lng]);
+                        }
+                        document.getElementById('driver-name').innerText = "Brother Joseph";
+                        document.getElementById('driver-car').innerText = "White Toyota Innova";
+                        document.getElementById('ride-status').innerText = "On the Way";
+                    }
+                });
+            },
+
+            initDetailMap(ride) {
+                // Static map for details view
+                const mapEl = document.getElementById('detail-map');
+                if (!mapEl) return;
+
+                // For simplicity in this demo, we use a fixed view. In production, these would be ride-specific coords.
+                const detailMap = L.map('detail-map', { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([14.5995, 120.9842], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(detailMap);
+                L.marker([14.5995, 120.9842]).addTo(detailMap).bindPopup(ride.pickup);
+                L.marker([14.6100, 121.0000]).addTo(detailMap).bindPopup(ride.destination);
+            },
+
+            // DRIVER ENGINE
+            initDriverTracker() {
+                const db = firebase.database();
+                const statusText = document.getElementById('driver-status-text');
+                const coordsText = document.getElementById('driver-coords');
+                const pulse = document.getElementById('driver-pulse');
+
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.watchPosition(
+                        (pos) => {
+                            db.ref('locations/driver_1').set({
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude,
+                                timestamp: Date.now()
+                            }).then(() => {
+                                pulse.style.display = 'block';
+                                statusText.innerText = "Live & Online";
+                                coordsText.innerText = `LAT: ${pos.coords.latitude.toFixed(4)} | LNG: ${pos.coords.longitude.toFixed(4)}`;
+                            });
+                        },
+                        (err) => { statusText.innerText = "GPS Error: " + err.message; },
+                        { enableHighAccuracy: true, timeout: 15000 }
+                    );
+                }
+            }
+        };
+
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
