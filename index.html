@@ -229,20 +229,63 @@
             </div>
         </div>
 
-        <!-- DRIVER VIEW -->
-        <div id="view-driver" class="view">
-            <div style="display:grid; place-items:center; height:100vh; padding:20px;">
-                <div class="status-card" style="text-align:center">
-                    <div class="pulse-container" id="driver-pulse" style="display:none; margin: 0 auto 20px; position:relative; width:60px; height:60px;">
-                        <div class="pulse-ring" style="position:absolute; width:100%; height:100%; border:4px solid #4CAF50; border-radius:50%; animation: pulse 2s infinite; opacity:0"></div>
-                        <div class="status-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:30px; height:30px; background:#4CAF50; border-radius:50%"></div>
+        <!-- DRIVER DASHBOARD -->
+        <div id="view-driver-dash" class="view">
+            <div style="padding: 30px 20px;">
+                <h2 class="heading">Driver Hub</h2>
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="label">Active Rides</div>
+                        <div class="value" id="driver-active-rides">2</div>
                     </div>
-                    <h2 style="color:var(--navy)" id="driver-status-text">Initializing GPS...</h2>
-                    <p style="color:var(--muted)" id="driver-coords">Waiting for signal...</p>
-                    <button class="button" style="margin-top:20px" onclick="location.reload()">Reconnect</button>
+                    <div class="stat-card">
+                        <div class="label">Total Passengers</div>
+                        <div class="value" id="driver-total-passengers">8</div>
+                    </div>
+                </div>
+
+                <div style="background: white; padding: 20px; border-radius: 24px; border: 1px solid #dceaf7; margin-bottom: 20px;">
+                    <h3 style="font-size: 18px; margin-bottom: 15px;">Post a New Ride</h3>
+                    <div class="form-group">
+                        <label>Destination</label>
+                        <input type="text" id="create-ride-dest" placeholder="e.g. Mini Chapel">
+                    </div>
+                    <div class="form-group">
+                        <label>Time</label>
+                        <input type="time" id="create-ride-time">
+                    </div>
+                    <div class="form-group">
+                        <label>Available Seats</label>
+                        <input type="number" id="create-ride-seats" placeholder="0">
+                    </div>
+                    <button class="button" style="width: 100%;" onclick="app.createRide()">Publish Ride</button>
+                </div>
+
+                <h3 class="heading" style="font-size: 22px; margin: 30px 0 15px;">My Scheduled Rides</h3>
+                <div id="driver-rides-list">
+                    <!-- Rides driven by this user -->
                 </div>
             </div>
         </div>
+
+        <!-- CAR LENDING DASHBOARD -->
+        <div id="view-car-lending" class="view">
+            <div style="padding: 30px 20px;">
+                <h2 class="heading">Car Lending Hub</h2>
+                <p style="color: var(--muted); margin-bottom: 20px;">Share your vehicle with the community or borrow one for a special event.</p>
+
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="font-size: 18px; font-weight: 700;">Available Vehicles</h3>
+                    <button class="button" style="padding: 8px 15px; font-size: 12px;" onclick="app.notify('Open Lending Form...', 'success')">Offer a Car</button>
+                </div>
+
+                <div id="car-lending-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                    <!-- Car lending cards injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- DRIVER VIEW (GPS Tracking) -->
 
         <!-- Global Bottom Nav -->
         <div class="bottom-nav" id="main-nav">
@@ -254,19 +297,12 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                 <span>Track</span>
             </div>
-            <div class="nav-item" onclick="app.navigate('driver')">
+            <div class="nav-item" onclick="app.navigate('driver-dash')">
                 <svg viewBox="0,0,24,24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <span>Driver</span>
             </div>
-            <div class="nav-item" onclick="app.navigate('user')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                <span>User</span>
-            </div>
-            <div class="nav-item" onclick="app.navigate('admin')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M9 3v18"></path><path d="M15 3v18"></path></svg>
-                <span>Admin</span>
-            </div>
-        </div>
+            <div class="nav-item" onclick="app.navigate('car-lending')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.//u la l'utilisateur s'est arrêté là. Je vais continuer l'implémentation.
     </div>
 
     <style>
